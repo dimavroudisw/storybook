@@ -2007,6 +2007,8 @@ The `toolsets` addon option (`dev`, `docs`, `test`) and the `X-MCP-Toolsets` HTT
 All supported tools for your Storybook setup are now enabled automatically based on your project's configuration (such as `@storybook/addon-vitest` for test tools and a components manifest for docs tools).
 
 Remove the `toolsets` option from your `@storybook/addon-mcp` configuration in `.storybook/main.js|ts` and any `X-MCP-Toolsets` header from your MCP client configuration.
+Storybook ignores both when they are still set, so tools that you turned off are available again.
+To keep an agent from using some of the tools, restrict them in the agent's own settings, such as its tool permissions.
 
 ### `storybook ai` command removed
 
