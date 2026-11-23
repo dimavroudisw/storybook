@@ -28,6 +28,8 @@ export const frameworkToRenderer: Record<
   [SupportedFramework.WEB_COMPONENTS_RSBUILD]: SupportedRenderer.WEB_COMPONENTS,
   [SupportedFramework.REACT_NATIVE_WEB_VITE]: SupportedRenderer.REACT,
   [SupportedFramework.NUXT]: SupportedRenderer.VUE3,
+  [SupportedFramework.ASTRO]: SupportedRenderer.ASTRO,
+  [SupportedFramework.ANALOG]: SupportedRenderer.ANGULAR,
 
   // renderers
   [SupportedRenderer.HTML]: SupportedRenderer.HTML,
@@ -61,6 +63,8 @@ export const frameworkToBuilder: Record<SupportedFramework, SupportedBuilder> = 
   [SupportedFramework.QWIK]: SupportedBuilder.VITE,
   [SupportedFramework.SOLID]: SupportedBuilder.VITE,
   [SupportedFramework.NUXT]: SupportedBuilder.VITE,
+  [SupportedFramework.ASTRO]: SupportedBuilder.VITE,
+  [SupportedFramework.ANALOG]: SupportedBuilder.VITE,
   [SupportedFramework.REACT_RSBUILD]: SupportedBuilder.RSBUILD,
   [SupportedFramework.VUE3_RSBUILD]: SupportedBuilder.RSBUILD,
   [SupportedFramework.HTML_RSBUILD]: SupportedBuilder.RSBUILD,
