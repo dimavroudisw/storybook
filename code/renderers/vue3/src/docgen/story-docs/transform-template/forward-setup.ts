@@ -352,7 +352,12 @@ function collectFreeIdentifiers(
   return false;
 }
 
-function collectFreeExpression(node: Node, scope: ReadonlySet<string>, free: Set<string>): boolean {
+/** Collects every free identifier an expression references; `false` for syntax it does not model. */
+export function collectFreeExpression(
+  node: Node,
+  scope: ReadonlySet<string>,
+  free: Set<string>
+): boolean {
   if (node.type === 'SpreadElement') {
     return collectFreeExpression(node.argument, scope, free);
   }

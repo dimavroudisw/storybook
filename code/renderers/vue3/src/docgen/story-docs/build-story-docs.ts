@@ -52,6 +52,7 @@ import {
 import type { ForwardableSetup } from './transform-template/forward-setup.ts';
 import { printH } from './print-h/print-h.ts';
 import { createRenderContext } from '../shared/render-primitives.ts';
+import { type StoryConstants, collectStoryConstants } from '../shared/story-constants.ts';
 import type { VueHolePlace } from '../../snippet-values.ts';
 import {
   readTemplateRenderConfig,
@@ -118,6 +119,8 @@ type StaticStoryRenderer =
 type StorySnippetResult = { snippet: string };
 type StaticStoryArgs = {
   classified: ClassifyArgsResult;
+  /** Story-file constants the arg values read, which the snippet declares along with them. */
+  constants: StoryConstants;
   /** Source text of everything reading the args statically could not account for. */
   unresolved: string[];
 };
@@ -349,7 +352,7 @@ function enrichStoryDoc(
   }
 
   const resolved = resolveStaticStoryArgs(storyExport, docgenArgInfo, options);
-  const { classified } = resolved;
+  const { classified, constants } = resolved;
   const { args, unresolved: classifyUnresolved } = classified;
   const unresolved = [...classifyUnresolved, ...resolved.unresolved];
 
@@ -361,7 +364,15 @@ function enrichStoryDoc(
 
   // The snippet, and its template: the same print with each place an arg prints marked as a hole.
   const print = (mark?: HoleMarks<VueHolePlace>['mark']) =>
-    renderStaticStorySnippet(renderer, classified, componentName, docgenArgInfo, options, mark);
+    renderStaticStorySnippet(
+      renderer,
+      classified,
+      constants,
+      componentName,
+      docgenArgInfo,
+      options,
+      mark
+    );
   const rendered = print();
   if (!rendered) {
     return withWarning(UNRENDERED_WARNINGS[renderer.kind]);
@@ -462,15 +473,20 @@ function resolveStaticStoryArgs(
 ): StaticStoryArgs {
   // A name another module owns stays as written, for the classifier to report.
   const resolved = options.resolver.resolve(storyExport);
+  // A value that reads a constant of the story file, as `lines.length` does, keeps reading it: the
+  // snippet declares the constant too, so the name is no longer one it cannot account for.
+  const constants = collectStoryConstants(resolved.args, options.resolver.ctx);
   return {
-    classified: classifyArgs(resolved.args, docgenArgInfo),
-    unresolved: resolved.unresolved,
+    classified: classifyArgs(resolved.args, docgenArgInfo, new Set(constants.keys())),
+    constants,
+    unresolved: resolved.unresolved.filter((source) => !constants.has(source)),
   };
 }
 
 function renderStaticStorySnippet(
   renderer: Exclude<StaticStoryRenderer, { kind: 'bail' }>,
   classified: ClassifyArgsResult,
+  constants: StoryConstants,
   componentName: string,
   docgenArgInfo: VueDocgenArgInfo,
   options: StoryDocsContext,
@@ -478,7 +494,7 @@ function renderStaticStorySnippet(
 ): StorySnippetResult | undefined {
   const componentImportStatement = options.snippet?.componentImportStatement;
   const { args } = classified;
-  const ctx = createRenderContext(mark);
+  const ctx = createRenderContext(mark, constants);
   const slots = docgenArgInfo.slots;
 
   // A story without a render function shows the component receiving the args directly.

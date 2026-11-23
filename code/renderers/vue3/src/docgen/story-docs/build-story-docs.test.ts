@@ -276,6 +276,282 @@ export const Primary = {
   });
 });
 
+describe('args that read story-file constants', () => {
+  const VIEWER_CATEGORIES = { html: 'props', lines: 'props', selectedLines: 'props' };
+  const viewerStory = (storySource: string) =>
+    primaryStory(storySource, undefined, VIEWER_CATEGORIES);
+
+  // A story file whose meta sets the args, as `preview.meta({ args })` does.
+  async function metaStory(storyFile: string) {
+    vol.fromJSON({ [STORY_PATH]: storyFile });
+    const payload = await buildStoryDocsPayload(
+      { entry: ENTRY },
+      { readDocgen: async (id) => docgen(id, VIEWER_CATEGORIES) }
+    );
+    expectTemplatesStripToSnippets(payload!);
+    return payload?.stories[STORY_ID];
+  }
+
+  it('declares the constant an arg written as a name is built from', async () => {
+    const story = await viewerStory(`
+const lines = ['a', 'b', 'c'];
+const html = \`<pre>\${lines.join('\\n')}</pre>\`;
+export const Primary = { args: { html } };
+`);
+    expect(story?.snippet).toMatchInlineSnapshot(`
+      "<script lang="ts" setup>
+      import MyButton from './MyButton.vue';
+
+      const lines = ['a', 'b', 'c'];
+
+      const html = \`<pre>\${lines.join('\\n')}</pre>\`;
+      </script>
+
+      <template>
+        <MyButton :html="html" />
+      </template>"
+    `);
+    expect(story?.warning).toBeUndefined();
+  });
+
+  it('declares the constant a member expression reads, under the name the story gives it', async () => {
+    const story = await viewerStory(`
+const lines = ['a', 'b', 'c'];
+export const Primary = { args: { lines: lines.length } };
+`);
+    expect(story?.snippet).toMatchInlineSnapshot(`
+      "<script lang="ts" setup>
+      import MyButton from './MyButton.vue';
+
+      const lines = ['a', 'b', 'c'];
+
+      const lines2 = lines.length;
+      </script>
+
+      <template>
+        <MyButton :lines="lines2" />
+      </template>"
+    `);
+    expect(story?.warning).toBeUndefined();
+  });
+
+  it('declares the constant a template literal written in the args reads', async () => {
+    const story = await viewerStory(`
+const lines = ['a', 'b', 'c'];
+export const Primary = { args: { html: \`<pre>\${lines.join('\\n')}</pre>\` } };
+`);
+    expect(story?.snippet).toMatchInlineSnapshot(`
+      "<script lang="ts" setup>
+      import MyButton from './MyButton.vue';
+
+      const lines = ['a', 'b', 'c'];
+
+      const html = \`<pre>\${lines.join('\\n')}</pre>\`;
+      </script>
+
+      <template>
+        <MyButton :html="html" />
+      </template>"
+    `);
+    expect(story?.warning).toBeUndefined();
+  });
+
+  it('declares a constant once, ahead of every constant and arg that reads it', async () => {
+    const story = await viewerStory(`
+const SEPARATOR = '\\n';
+const lines = ['a', 'b', 'c'];
+const text = lines.join(SEPARATOR);
+const unused = lines.length * 2;
+export const Primary = { args: { html: \`<pre>\${text}</pre>\`, lines: lines.length } };
+`);
+    expect(story?.snippet).toMatchInlineSnapshot(`
+      "<script lang="ts" setup>
+      import MyButton from './MyButton.vue';
+
+      const SEPARATOR = '\\n';
+
+      const lines = ['a', 'b', 'c'];
+
+      const text = lines.join(SEPARATOR);
+
+      const html = \`<pre>\${text}</pre>\`;
+
+      const lines2 = lines.length;
+      </script>
+
+      <template>
+        <MyButton :html="html" :lines="lines2" />
+      </template>"
+    `);
+    expect(story?.warning).toBeUndefined();
+  });
+
+  it('carries the args a CSF factory meta sets from module-level constants', async () => {
+    const story = await metaStory(`
+import preview from '#.storybook/preview';
+import MyButton from './MyButton.vue';
+
+const lines = ['a', 'b', 'c'];
+const html = \`<pre>\${lines.join('\\n')}</pre>\`;
+
+const meta = preview.meta({
+  component: MyButton,
+  title: 'Example/MyButton',
+  args: { html, lines: lines.length, selectedLines: null },
+});
+
+export const Primary = meta.story({});
+`);
+    expect(story?.snippet).toMatchInlineSnapshot(`
+      "<script lang="ts" setup>
+      import MyButton from './MyButton.vue';
+
+      const lines = ['a', 'b', 'c'];
+
+      const html = \`<pre>\${lines.join('\\n')}</pre>\`;
+
+      const lines2 = lines.length;
+      </script>
+
+      <template>
+        <MyButton :html="html" :lines="lines2" :selectedLines="null" />
+      </template>"
+    `);
+    expect(story?.warning).toBeUndefined();
+  });
+
+  it('carries the args of the meta and of the story, the story writing over the meta', async () => {
+    const story = await metaStory(`
+import MyButton from './MyButton.vue';
+
+const lines = ['a', 'b', 'c'];
+const more = ['d', 'e'];
+
+export default {
+  component: MyButton,
+  title: 'Example/MyButton',
+  args: { html: lines.join(''), lines: lines.length },
+};
+
+export const Primary = { args: { lines: more.length, selectedLines: [lines[0]] } };
+`);
+    expect(story?.snippet).toMatchInlineSnapshot(`
+      "<script lang="ts" setup>
+      import MyButton from './MyButton.vue';
+
+      const lines = ['a', 'b', 'c'];
+
+      const more = ['d', 'e'];
+
+      const html = lines.join('');
+
+      const lines2 = more.length;
+
+      const selectedLines = [lines[0]];
+      </script>
+
+      <template>
+        <MyButton :html="html" :lines="lines2" :selectedLines="selectedLines" />
+      </template>"
+    `);
+    expect(story?.warning).toBeUndefined();
+  });
+
+  it('declares the constant a listener reads', async () => {
+    const story = await primaryStory(
+      `
+const lines = ['a', 'b', 'c'];
+export const Primary = { args: { onSelect: (index: number) => console.log(lines[index]) } };
+`,
+      undefined,
+      { select: 'events' }
+    );
+    expect(story?.snippet).toMatchInlineSnapshot(`
+      "<script lang="ts" setup>
+      import MyButton from './MyButton.vue';
+
+      const lines = ['a', 'b', 'c'];
+
+      const onSelect = (index: number) => console.log(lines[index]);
+      </script>
+
+      <template>
+        <MyButton @select="onSelect" />
+      </template>"
+    `);
+    expect(story?.warning).toBeUndefined();
+  });
+
+  it('renders as the story does', async () => {
+    const story = await primaryStory(
+      `
+const words = ['a', 'b', 'c'];
+const label = \`<\${words.join('|')}>\`;
+export const Primary = { args: { label, title: words.length, modelValue: [words[1]] } };
+`,
+      undefined,
+      { label: 'props', title: 'props', modelValue: 'props' }
+    );
+    expect(await renderSnippet(story!.snippet!)).toBe(
+      await renderStory(`<MyButton v-bind="args" />`, {
+        label: '<a|b|c>',
+        title: 3,
+        modelValue: ['b'],
+      })
+    );
+  });
+
+  it('follows a control that sets an arg read from a constant', async () => {
+    const story = await viewerStory(`
+const lines = ['a', 'b', 'c'];
+export const Primary = { args: { lines: lines.length } };
+`);
+    expect(
+      fillTemplate(
+        story!.template! as SnippetTemplate<VueHolePlace>,
+        { initialArgs: { lines: 3 }, unmappedArgs: { lines: 5 } },
+        printHole
+      )
+    ).toMatchInlineSnapshot(`
+      "<script lang="ts" setup>
+      import MyButton from './MyButton.vue';
+
+      const lines = ['a', 'b', 'c'];
+
+      const lines2 = 5;
+      </script>
+
+      <template>
+        <MyButton :lines="lines2" />
+      </template>"
+    `);
+  });
+
+  it('names an arg that reads what the snippet cannot declare', async () => {
+    const story = await viewerStory(`
+import { theme } from './theme';
+let count = 1;
+count += 1;
+const lines = ['a', theme.name];
+export const Primary = {
+  args: { html: 'Hi', lines: lines.length, selectedLines: [count] },
+};
+`);
+    expect(story?.snippet).toMatchInlineSnapshot(`
+      "<script lang="ts" setup>
+      import MyButton from './MyButton.vue';
+      </script>
+
+      <template>
+        <MyButton html="Hi" />
+      </template>"
+    `);
+    expect(story?.warning).toMatchInlineSnapshot(
+      `"Incomplete snippet: \`lines: lines.length\`, \`selectedLines: [count]\`, \`lines\`, \`count\` could not be resolved statically."`
+    );
+  });
+});
+
 // This provider writes the payload's templates, so their holes stand in Vue places.
 const vueTemplate = (template: SnippetTemplate) => template as SnippetTemplate<VueHolePlace>;
 
