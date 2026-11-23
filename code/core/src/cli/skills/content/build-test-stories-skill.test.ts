@@ -66,18 +66,6 @@ describe('buildTestStoriesSkill', () => {
     );
   });
 
-  it('says when to skip the step, and keeps its tool, when main.ts turns the test toolset off', () => {
-    const text = buildTestStoriesSkill({ ...everything, transport: 'mcp', toolsetOff: true });
-
-    expect(text).toContain(
-      'The `main.ts` of this project turns the `test` toolset of the Storybook MCP server off. When the server does not give you `test-run`, skip this step.'
-    );
-    expect(text).toContain('Call `test-run` after every change');
-    expect(buildTestStoriesSkill({ ...everything, transport: 'mcp' })).not.toContain(
-      'skip this step'
-    );
-  });
-
   it('names no review and no other skill', () => {
     expect(buildTestStoriesSkill(everything)).not.toMatch(
       /review|component-docs|write-stories|ui-review/

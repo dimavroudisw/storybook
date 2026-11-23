@@ -16,7 +16,6 @@ import { OpenServiceMissingToolsetError, toMcpToolName } from 'storybook/open-se
 import {
   getToolsetToolMetadata,
   registerToolsetTool,
-  type McpToolsetGroup,
   type ToolsetToolOptions,
 } from './toolset-tools.ts';
 
@@ -32,57 +31,34 @@ export type ToolMetadata = {
 export type AddonToolRegistryContext = {
   availability: ToolAvailability;
   multiSource?: boolean;
-  toolsets?: AddonContext['toolsets'];
 };
-
-type ToolEnabled = Parameters<McpServer<any, AddonContext>['tool']>[0]['enabled'];
 
 type AddonToolDefinition = {
   name: string;
-  toolset: McpToolsetGroup;
   available?: (context: AddonToolRegistryContext) => boolean;
   getMetadata: (context: AddonToolRegistryContext) => ToolMetadata;
   register: (
     server: McpServer<any, AddonContext>,
-    context: AddonToolRegistryContext,
-    enabled: ToolEnabled
+    context: AddonToolRegistryContext
   ) => Promise<void>;
 };
-
-const isToolsetEnabled = (
-  toolset: McpToolsetGroup,
-  toolsets: AddonContext['toolsets'] | undefined
-) => toolsets?.[toolset] ?? true;
 
 const isToolAvailable = (definition: AddonToolDefinition, context: AddonToolRegistryContext) =>
   definition.available?.(context) ?? true;
 
-const isMetadataToolEnabled = (
-  definition: AddonToolDefinition,
-  context: AddonToolRegistryContext
-) => isToolsetEnabled(definition.toolset, context.toolsets) && isToolAvailable(definition, context);
-
-const createToolsetEnabled =
-  (server: McpServer<any, AddonContext>, toolset: McpToolsetGroup): ToolEnabled =>
-  () =>
-    server.ctx.custom?.toolsets?.[toolset] ?? true;
-
 /**
  * Declares an MCP tool that is backed by a core toolset method.
  *
- * The addon contributes only what is specific to this surface: the MCP toolset grouping, the
- * availability gate, and any MCP-only metadata. Name, title, description, schemas, behaviour and
- * telemetry all come from the method.
+ * The addon contributes only what is specific to this surface: the availability gate and any
+ * MCP-only metadata. Name, title, description, schemas, behaviour and telemetry all come from the
+ * method.
  */
-function fromToolset(
-  definition: Omit<AddonToolDefinition, 'name' | 'getMetadata' | 'register'> & {
-    options: ToolsetToolOptions;
-    available?: (context: AddonToolRegistryContext) => boolean;
-  }
-): AddonToolDefinition {
-  const { options, available, ...rest } = definition;
+function fromToolset(definition: {
+  options: ToolsetToolOptions;
+  available?: (context: AddonToolRegistryContext) => boolean;
+}): AddonToolDefinition {
+  const { options, available } = definition;
   return {
-    ...rest,
     // Read from the constant, not the registry: this array is built at import time, while toolsets
     // register later from their preset hooks. Each availability gate is written to match the
     // condition under which its toolset registers; if they still disagree, resolution fails loudly
@@ -91,8 +67,8 @@ function fromToolset(
     name: toMcpToolName(options.method),
     available: (context) => available?.(context) ?? true,
     getMetadata: () => getToolsetToolMetadata(options),
-    register: async (server, _context, enabled) => {
-      registerToolsetTool(server, options, enabled);
+    register: async (server) => {
+      registerToolsetTool(server, options);
     },
   };
 }
@@ -132,11 +108,10 @@ function docsToolDefinition(method: keyof typeof DOCS_EVENT_NAMES): AddonToolDef
 
   return {
     name: toMcpToolName(method),
-    toolset: 'docs',
     available: ({ availability }) => availability.docsEnabled,
     getMetadata: (context) => getToolsetToolMetadata(forContext(context)),
-    register: async (server, context, enabled) => {
-      registerToolsetTool(server, forContext(context), enabled);
+    register: async (server, context) => {
+      registerToolsetTool(server, forContext(context));
     },
   };
 }
@@ -149,7 +124,6 @@ const docsToolDefinitions: AddonToolDefinition[] = [
 
 const addonToolDefinitions: AddonToolDefinition[] = [
   fromToolset({
-    toolset: 'dev',
     options: {
       method: 'stories.preview',
       mcpEventName: 'tool:previewStories',
@@ -157,16 +131,13 @@ const addonToolDefinitions: AddonToolDefinition[] = [
     },
   }),
   fromToolset({
-    toolset: 'dev',
     options: { method: 'stories.changed', mcpEventName: 'tool:getChangedStories' },
   }),
   fromToolset({
-    toolset: 'dev',
     available: ({ availability }) => availability.moduleGraphSupported,
     options: { method: 'stories.findByComponent', mcpEventName: 'tool:getStoriesByComponent' },
   }),
   fromToolset({
-    toolset: 'dev',
     options: {
       method: 'review.create',
       mcpEventName: 'tool:displayReview',
@@ -174,7 +145,6 @@ const addonToolDefinitions: AddonToolDefinition[] = [
     },
   }),
   fromToolset({
-    toolset: 'test',
     available: ({ availability }) => availability.testSupported,
     options: { method: 'test.run', mcpEventName: 'tool:runStoryTests' },
   }),
@@ -210,7 +180,7 @@ function resolveDefinitionOrDrop<T>(name: string, resolve: () => T): T | undefin
 
 export function getAddonToolMetadata(context: AddonToolRegistryContext): ToolMetadata[] {
   return addonToolDefinitions
-    .filter((definition) => isMetadataToolEnabled(definition, context))
+    .filter((definition) => isToolAvailable(definition, context))
     .flatMap((definition) => {
       const metadata = resolveDefinitionOrDrop(definition.name, () =>
         definition.getMetadata(context)
@@ -223,24 +193,12 @@ export async function registerAddonMcpTools(
   server: McpServer<any, AddonContext>,
   context: AddonToolRegistryContext
 ) {
-  // The preview app resource ships with the preview tool: when the dev toolset is disabled the
-  // tool is absent, and the resource must not appear in resources/list either — the same boot
-  // gate the tool's own registration uses below.
-  if (isToolsetEnabled('dev', context.toolsets)) {
-    await addPreviewStoriesResource(server);
-  }
+  await addPreviewStoriesResource(server);
 
   for (const definition of addonToolDefinitions) {
-    if (
-      isToolsetEnabled(definition.toolset, context.toolsets) &&
-      isToolAvailable(definition, context)
-    ) {
+    if (isToolAvailable(definition, context)) {
       try {
-        await definition.register(
-          server,
-          context,
-          createToolsetEnabled(server, definition.toolset)
-        );
+        await definition.register(server, context);
       } catch (error) {
         dropToolIfToolsetMissing(definition.name, error);
       }
