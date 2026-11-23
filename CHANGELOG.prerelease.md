@@ -1,3 +1,19 @@
+## 11.0.0-beta.5
+
+- Addon Vitest: Report a mismatching storybook version at startup - [#37626](https://github.com/storybookjs/storybook/pull/37626), thanks @huang-julien!
+- Angular-Vite: Resolve styles against bridged workspace root in addon-vitest - [#37637](https://github.com/storybookjs/storybook/pull/37637), thanks @Hricha-Sharma!
+- CLI: List failed automigrations in the upgrade summary - [#37635](https://github.com/storybookjs/storybook/pull/37635), thanks @omerfarukgurbuz!
+- CLI: Refactor dep tree search to be breadth-first - [#37618](https://github.com/storybookjs/storybook/pull/37618), thanks @Sidnioulz!
+- CLI: Scaffold React TypeScript stories as .stories.tsx - [#37640](https://github.com/storybookjs/storybook/pull/37640), thanks @NishitaUpreti!
+- CLI: Show the fix's link with automigration details - [#37643](https://github.com/storybookjs/storybook/pull/37643), thanks @DanShinde!
+- Core: Don't crash when network interfaces cannot be read - [#37182](https://github.com/storybookjs/storybook/pull/37182), thanks @lazerg!
+- Core: Guard requestIdleCallback for Safari story preload - [#37641](https://github.com/storybookjs/storybook/pull/37641), thanks @rome-xi!
+- Core: Keep component icons for components with subcomponents - [#37234](https://github.com/storybookjs/storybook/pull/37234), thanks @Erfouni!
+- Core: Make hover/neighbor preloading follow navigation logic - [#37660](https://github.com/storybookjs/storybook/pull/37660), thanks @Sidnioulz!
+- Core: Remove argTypes from the render and decorator context - [#37614](https://github.com/storybookjs/storybook/pull/37614), thanks @valentinpalkovic!
+- Test: Wait for storyRendered before clicking in the Actions badge e2e - [#37525](https://github.com/storybookjs/storybook/pull/37525), thanks @obvious-autobuild!
+- UI: Fix Search Result Highlighting - [#37620](https://github.com/storybookjs/storybook/pull/37620), thanks @Sidnioulz!
+
 ## 11.0.0-beta.4
 
 - Addon A11y: Update vision simulators to be more rigorous - [#37454](https://github.com/storybookjs/storybook/pull/37454), thanks @Sidnioulz!
